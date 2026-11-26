@@ -1,0 +1,13 @@
+# Secrets locaux : ne jamais publier
+.env
+.env.*
+!.env.example
+
+# Dépendances et fichiers générés
+node_modules/
+dist/
+build/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
