@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Teacher Match - Configuration incomplète</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="entete">
+    <div class="conteneur entete__contenu">
+      <span class="logo">
+        <span class="logo__marque">Teacher Match</span>
+        <span class="logo__sous-titre">Mise en relation enseignants / cours</span>
+      </span>
+    </div>
+  </header>
+
+  <main id="contenu" class="conteneur conteneur--etroit">
+    <section class="carte">
+      <h1>Configuration incomplète</h1>
+      <p>
+        Le serveur fonctionne, mais l'application reste fermée tant que les variables
+        obligatoires ne sont pas renseignées dans Railway (service → onglet
+        <strong>Variables</strong>) :
+      </p>
+      <ul>
+        <li><strong>DATABASE_URL</strong> : référence vers la base PostgreSQL du projet ;</li>
+        <li><strong>APP_PASSWORD</strong> : mot de passe d'accès, 12 caractères minimum.</li>
+      </ul>
+      <p class="carte__aide">
+        Le détail du problème figure dans les journaux du service (onglet
+        <strong>Deployments</strong> → <strong>View logs</strong>). Railway redéploie
+        automatiquement après l'ajout d'une variable.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

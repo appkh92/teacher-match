@@ -1,291 +1,264 @@
 # Teacher Match
 
 Application web d'aide à la décision pour la mise en relation entre les
-**enseignants** et les **cours** d'un établissement scolaire ou d'un centre de
-formation. Le responsable pédagogique importe le syllabus d'un cours ; Teacher
-Match doit ensuite en extraire les compétences visées, définir le profil
-enseignant recherché, comparer les profils disponibles et proposer un classement
-argumenté. **La décision finale reste humaine.**
+**enseignants** et les **cours** d'un établissement. Le responsable pédagogique
+importe le syllabus d'un cours ; Teacher Match en extraira ensuite les
+compétences visées, définira le profil enseignant recherché, comparera les
+profils disponibles et proposera un classement argumenté. **La décision finale
+reste humaine.**
 
 Interface entièrement en français.
 
 ---
 
-## 1. État actuel du projet
-
-Le projet est construit **étape par étape**, à votre validation.
+## 1. État du projet
 
 | Étape | Fonctionnalité | État |
 | --- | --- | --- |
-| 1 | Page d'accueil, import de plusieurs syllabi (PDF/Word), enregistrement en base | **Livrée** |
+| 1 | Accueil, connexion sécurisée, import de plusieurs syllabi (PDF/Word), enregistrement en base, téléchargement, suppression, historique | **Livrée (v1.1)** |
 | 2 | Analyse du syllabus par l'IA et extraction des compétences visées | À venir |
-| 3 | Définition du profil enseignant recherché et des critères de matching | À venir |
+| 3 | Profil enseignant recherché et critères de matching | À venir |
 | 4 | Recherche externe d'enseignants (sources autorisées) et analyse des CV | À venir |
 | 5 | Classement automatique avec scores et justifications | À venir |
 
-### Ce que fait l'étape 1
+### Corrections de la version 1.1
 
-- Affiche une page d'accueil Teacher Match.
-- Propose un formulaire d'import d'un ou plusieurs syllabi au format PDF ou Word.
-- Permet de sélectionner **plusieurs documents en une seule fois** (clic ou
-  glisser-déposer), jusqu'à 10 par envoi.
-- Valide chaque document côté serveur (extension, type MIME, signature du
-  fichier, taille).
-- Enregistre chaque syllabus **individuellement** dans PostgreSQL, contenu
-  binaire compris, pour permettre son analyse ultérieure.
-- Regroupe les documents importés ensemble dans une même « demande » datée.
-- Affiche un message confirmant l'importation, avec la liste des documents
-  enregistrés et la référence de chacun.
-- Affiche la liste des syllabi déjà importés et l'historique des demandes.
+Pourquoi la version 1.0 ne démarrait pas (ou tombait) sur Railway :
 
-### Ce que l'étape 1 ne fait pas encore
+1. **Arrêt brutal au chargement** : `src/db.js` appelait `process.exit(1)` dès
+   que `DATABASE_URL` manquait, avant même l'ouverture du port. Railway
+   relançait le service en boucle puis marquait le déploiement en échec.
+2. **Contrôle de santé bloquant** : `/health` renvoyait une erreur 503 tant que
+   la base n'était pas joignable. Si PostgreSQL démarrait après l'application,
+   Railway considérait le déploiement comme raté.
+3. **Plantage du processus** : dans la route d'import, la connexion à la base
+   était ouverte hors du bloc `try`. Au moindre incident PostgreSQL, la promesse
+   rejetée non gérée arrêtait Node.js (comportement par défaut depuis Node 15).
+4. **TLS imposé partout** : le chiffrement était forcé même sur le réseau privé
+   Railway (`*.railway.internal`), ce qui peut faire échouer la connexion.
+5. **Une seule tentative de création des tables** : si la base n'était pas
+   prête au démarrage, les tables n'étaient jamais créées.
 
-- Aucune analyse du syllabus par l'IA n'est déclenchée : le bouton
-  « Générer le classement » enregistre les documents et prépare la suite.
-- Aucune recherche externe d'enseignants, aucun classement de profils.
-- La page « Résultats » affiche l'emplacement des futures sections.
+Désormais, le serveur démarre toujours, `/health` répond 200 dès que le
+processus vit, la création des tables est retentée toutes les 15 secondes, et
+une page « Configuration incomplète » s'affiche tant qu'une variable
+obligatoire manque (rien n'est accessible dans cet état).
+
+Sécurisation ajoutée :
+
+- **Authentification obligatoire** : la v1.0 n'en avait aucune ; toute personne
+  connaissant l'adresse pouvait lister, importer et télécharger les syllabi.
+  Toutes les pages et toute l'API exigent maintenant une connexion
+  (mot de passe `APP_PASSWORD`, session signée HMAC, cookie `HttpOnly`,
+  `SameSite=Strict`, `Secure`).
+- **Protection CSRF** : vérification de l'origine sur toute requête qui
+  modifie des données, en plus du cookie `SameSite=Strict`.
+- **Limitation de débit** : 10 tentatives de connexion par quart d'heure et
+  par adresse IP, 60 imports par heure, 3 imports simultanés au plus
+  (protection de la mémoire).
+- **Dépendances corrigées** : `multer` 1.4.5 (vulnérabilités de déni de
+  service connues) remplacé par `multer` 2.x ; `express` 4.21.x ; dépendance
+  Anthropic inutilisée retirée (elle sera ajoutée à l'étape 2).
+- **Validation renforcée** : un DOCX doit être une vraie archive Word (pas
+  n'importe quel ZIP), signature OLE complète pour les DOC, suppression des
+  caractères Unicode d'inversion de sens dans les noms (usurpation
+  d'extension), type MIME enregistré déduit de l'extension et non repris du
+  navigateur.
+- **Téléchargement durci** : nom de fichier encodé selon la RFC 5987,
+  `Content-Security-Policy: sandbox`, aucune mise en cache.
+- **Aucune fuite technique** : `/health` n'expose plus les messages d'erreur
+  ni la présence de la clé Anthropic ; les erreurs renvoyées au navigateur
+  sont génériques.
+- **Interface sans injection HTML** : tout le contenu dynamique est inséré via
+  `textContent`.
+- **Droit à l'effacement (RGPD)** : bouton « Supprimer » sur chaque syllabus ;
+  les demandes devenues vides sont supprimées.
+- En-têtes HSTS, `frame-ancestors 'none'`, `Cross-Origin-Opener-Policy`,
+  `noindex`, arrêt propre sur `SIGTERM`.
 
 ---
 
 ## 2. Pile technique
 
-- **Node.js 20+** et **Express** (serveur HTTP).
-- Pages **HTML / CSS / JavaScript** sans framework lourd.
-- **PostgreSQL** via la variable d'environnement `DATABASE_URL`.
-- **API Anthropic (Claude)** — appelée **côté serveur uniquement**, clé lue dans
-  `ANTHROPIC_API_KEY`. La dépendance est déjà installée : l'appel sera ajouté à
-  l'étape 2. Le navigateur ne parle jamais directement au modèle.
-- Déploiement sur **Railway** depuis un dépôt **GitHub**.
+- **Node.js 20+** et **Express 4**, sans framework front-end.
+- **PostgreSQL** via `DATABASE_URL`.
+- **API Anthropic (Claude)** : prévue pour l'étape 2, côté serveur uniquement.
+- Déploiement sur **Railway** depuis **GitHub** (builder Railpack).
 
 ---
 
 ## 3. Arborescence du dépôt
 
-Tous les chemins sont **relatifs à la racine du dépôt GitHub**.
+Chemins relatifs à la racine du dépôt GitHub.
 
 ```
 .
 ├── .env.example              Modèle des variables (aucune valeur réelle)
 ├── .gitignore                Exclut .env, node_modules, données locales
-├── package.json              Dépendances + script "start"
+├── package.json              Dépendances, scripts "start" et "test"
 ├── railway.json              Configuration de déploiement Railway
 ├── README.md                 Ce document
-├── public/                   Interface (servie telle quelle par Express)
-│   ├── index.html            Page d'accueil : formulaire d'import
-│   ├── resultats.html        Page résultats (étape 5)
-│   ├── historique.html       Page historique des demandes
-│   ├── styles.css            Feuille de style unique
-│   ├── accueil.js            Sélection des fichiers + envoi vers l'API
+├── public/                   Interface
+│   ├── connexion.html        Page de connexion (publique)
+│   ├── connexion.js          Messages de la page de connexion (public)
+│   ├── configuration.html    Affichée si une variable obligatoire manque
+│   ├── index.html            Accueil : import, liste, suppression
+│   ├── resultats.html        Résultats (étape 5)
+│   ├── historique.html       Historique des demandes
+│   ├── styles.css            Feuille de style unique (publique)
+│   ├── accueil.js            Sélection, envoi, liste des syllabi
 │   └── historique.js         Chargement de l'historique
-└── src/                      Serveur (jamais exposé au navigateur)
-    ├── server.js             Point d'entrée : Express, sécurité, routes
-    ├── db.js                 Pool PostgreSQL + création des tables
-    ├── validation.js         Validation des fichiers et des entrées
-    └── routes/
-        └── syllabi.js        Import, liste, téléchargement, historique
+├── src/                      Serveur (jamais exposé au navigateur)
+│   ├── server.js             Point d'entrée : ordre des protections, routes
+│   ├── config.js             Lecture et contrôle des variables
+│   ├── auth.js               Connexion, sessions signées, déconnexion
+│   ├── security.js           En-têtes, limitation de débit, contrôle d'origine
+│   ├── db.js                 Pool PostgreSQL, tables, reprise automatique
+│   ├── ssl.js                Choix du chiffrement de la connexion PostgreSQL
+│   ├── validation.js         Validation des fichiers et des entrées
+│   └── routes/
+│       └── syllabi.js        Import, liste, téléchargement, suppression, historique
+└── test/                     Tests automatiques (node --test, sans dépendance)
+    ├── auth.test.js
+    └── validation.test.js
 ```
 
 ---
 
 ## 4. Variables à renseigner sur Railway
 
-Dans Railway : ouvrez votre projet → cliquez sur le service → onglet
-**Variables** → **New Variable**.
+Railway : projet → service applicatif → onglet **Variables** → **New Variable**.
 
 | Variable | Obligatoire | Rôle |
 | --- | --- | --- |
-| `DATABASE_URL` | Oui | Chaîne de connexion PostgreSQL. **Ajoutée automatiquement** quand vous ajoutez le plugin PostgreSQL au projet (Référence de variable `${{Postgres.DATABASE_URL}}`). |
-| `ANTHROPIC_API_KEY` | Pour l'étape 2 | Clé API Anthropic (`sk-ant-...`), créée sur console.anthropic.com. |
-| `ANTHROPIC_MODEL` | Non | Modèle Claude utilisé. Par défaut `claude-3-5-sonnet-latest`. |
-| `MAX_FILE_SIZE_MB` | Non | Taille maximale d'un document importé. Par défaut `10`. |
-| `PORT` | Non | Railway la fournit automatiquement. Ne pas la définir à la main. |
+| `DATABASE_URL` | **Oui** | Référence vers la base : **Add Reference** → `${{Postgres.DATABASE_URL}}`. |
+| `APP_PASSWORD` | **Oui** | Mot de passe d'accès à l'application, **12 caractères minimum**. Le modifier déconnecte toutes les sessions. |
+| `SESSION_SECRET` | Recommandée | Clé de signature des sessions, 32 caractères aléatoires minimum (par exemple un mot de passe généré par votre gestionnaire). Sans elle, les sessions sont perdues à chaque redéploiement. |
+| `SESSION_HOURS` | Non | Durée d'une session en heures. Par défaut `12`. |
+| `DATABASE_SSL` | Non | Laisser vide (automatique). `disable`, `require` ou `verify` pour forcer. |
+| `MAX_FILE_SIZE_MB` | Non | Taille maximale d'un document. Par défaut `10`, maximum `25`. |
+| `ANTHROPIC_API_KEY` | Étape 2 | Clé API Anthropic, côté serveur uniquement. |
+| `ANTHROPIC_MODEL` | Étape 2 | Modèle Claude. Valeur proposée : `claude-sonnet-5-5`. |
+| `PORT` | Non | Fournie par Railway. Ne pas la définir. |
 
-Aucune clé n'est écrite dans le code : tout passe par ces variables
-d'environnement. Le fichier `.env.example` du dépôt liste les mêmes noms, sans
-aucune valeur, et `.gitignore` empêche tout fichier `.env` d'être versionné.
+Aucune clé n'est écrite dans le code. `.gitignore` empêche tout fichier `.env`
+d'être versionné.
 
 ---
 
-## 5. Configuration de PostgreSQL
+## 5. PostgreSQL
 
-**Sur Railway :**
-
-1. Dans votre projet Railway, cliquez sur **+ New** → **Database** → **Add
-   PostgreSQL**.
-2. Attendez que le service PostgreSQL soit au statut *Active*.
-3. Cliquez sur votre service applicatif → **Variables** → **New Variable** →
-   **Add Reference** → choisissez `DATABASE_URL` du service PostgreSQL.
-4. C'est tout : la table est créée automatiquement.
-
-**Les tables sont créées automatiquement au démarrage** du serveur si elles
-n'existent pas (`CREATE TABLE IF NOT EXISTS`). Aucune migration manuelle n'est
-nécessaire. Les données déjà présentes ne sont jamais supprimées.
-
-Tables créées :
+1. Dans le projet Railway : **+ New** → **Database** → **Add PostgreSQL**.
+2. Service applicatif → **Variables** → **New Variable** → **Add Reference** →
+   `DATABASE_URL` du service PostgreSQL.
+3. Les tables sont créées automatiquement (`CREATE TABLE IF NOT EXISTS`), et la
+   création est retentée toutes les 15 secondes si la base n'est pas encore
+   prête. Aucune donnée existante n'est supprimée : une base créée avec la
+   v1.0 est reprise telle quelle.
 
 | Table | Contenu |
 | --- | --- |
-| `syllabi` | Un enregistrement par syllabus importé : nom d'origine, nom de stockage, type MIME, taille, **contenu du fichier**, statut, date d'import. |
-| `demandes` | Une demande = un envoi groupé : libellé, nombre de syllabi, date de la demande. |
-| `demande_syllabi` | Lien entre une demande et les syllabi qu'elle contient. |
-| `resultats` | Prévue pour la suite (analyse, compétences visées, profil recherché, critères, classement, sources). Créée vide. |
+| `syllabi` | Un enregistrement par syllabus : nom d'origine, nom de stockage aléatoire, type MIME, taille, contenu, statut, date d'import. |
+| `demandes` | Un envoi groupé : libellé, nombre de syllabi, date. |
+| `demande_syllabi` | Lien entre demandes et syllabi. |
+| `resultats` | Prévue pour les étapes suivantes. Créée vide. |
 
-Pour vérifier la connexion une fois le site en ligne, ouvrez l'adresse
-`https://votre-domaine.up.railway.app/health` : la réponse doit contenir
-`"base_donnees":"connectee"`.
-
----
-
-## 6. Configuration de l'API Anthropic
-
-Cette configuration est **préparée mais pas encore utilisée** : l'appel au
-modèle sera écrit à l'étape 2.
-
-1. Créez un compte sur **console.anthropic.com**.
-2. Section **API Keys** → **Create Key** → copiez la clé (elle ne s'affiche
-   qu'une fois).
-3. Sur Railway, ajoutez la variable `ANTHROPIC_API_KEY` avec cette valeur.
-4. La clé ne doit **jamais** apparaître dans le dépôt GitHub, ni dans un fichier
-   envoyé au navigateur. Le code lit uniquement
-   `process.env.ANTHROPIC_API_KEY`, et l'appel au modèle se fera exclusivement
-   dans `src/`.
-
-Bonne pratique : créez une clé dédiée au projet et fixez un plafond de dépense
-mensuel dans la console Anthropic.
+Vérification : `https://votre-domaine.up.railway.app/health` doit renvoyer
+`"base_donnees":"connectee"` et `"configuration":"complete"`.
 
 ---
 
-## 7. Procédure de déploiement depuis GitHub (sans ligne de commande)
+## 6. Déploiement depuis GitHub (sans ligne de commande)
 
-### 7.1 Créer le dépôt et déposer les fichiers
+### 6.1 Mettre à jour le dépôt existant
 
-1. Connectez-vous à **github.com** → **New repository**.
-2. Nom : `teacher-match`. Visibilité : *Private* de préférence (le projet
-   contient du code métier). Ne cochez **pas** « Add a README file » : le dépôt
-   doit rester vide.
-3. **Create repository**.
-4. Sur la page du dépôt vide, cliquez sur **uploading an existing file**.
-5. Déposez-y les fichiers du projet **en respectant l'arborescence** :
-   - les fichiers de la racine (`.env.example`, `.gitignore`, `package.json`,
-     `railway.json`, `README.md`) ;
-   - le contenu du dossier `public/` dans un dossier `public` ;
-   - le contenu du dossier `src/` dans un dossier `src` (avec le sous-dossier
-     `routes`).
+1. Sur github.com, ouvrez le dépôt `teacher-match`.
+2. **Add file** → **Upload files**, puis glissez-déposez **le contenu** du
+   dossier décompressé (fichiers de la racine et dossiers `public`, `src`,
+   `test`). GitHub conserve l'arborescence des dossiers déposés et remplace
+   les fichiers existants.
+3. Ne déposez jamais de dossier `node_modules` ni de fichier `.env`.
+4. **Commit changes**.
 
-   Pour créer les dossiers : dans l'interface **Add file** → **Create new
-   file**, tapez `public/index.html` dans le champ du nom — GitHub crée le
-   dossier automatiquement — puis collez le contenu. Répétez pour chaque
-   fichier.
+Pour un nouveau dépôt : **New repository** (de préférence *Private*, sans
+README), puis **uploading an existing file** et même procédure.
 
-   *Astuce* : si vous téléchargez le projet au format ZIP, supprimez d'abord le
-   dossier `node_modules` s'il existe — il ne doit jamais être déposé sur GitHub.
-6. En bas de page : **Commit changes**.
+### 6.2 Railway
 
-### 7.2 Déployer sur Railway
-
-1. Allez sur **railway.app** → **Start a New Project** → **Deploy from GitHub
-   repo**.
-2. Autorisez Railway à accéder à votre compte GitHub, puis choisissez le dépôt
+1. Si ce n'est pas déjà fait : **New Project** → **Deploy from GitHub repo** →
    `teacher-match`.
-3. Railway détecte automatiquement Node.js et lance `npm install` puis
-   `npm start` (le script `start` défini dans `package.json`).
-4. Ajoutez le plugin PostgreSQL (§5) et la variable `DATABASE_URL` par
-   référence.
-5. **Settings** → **Networking** → **Generate Domain** pour obtenir une adresse
-   publique.
-6. Railway redéploie automatiquement à chaque nouveau commit sur la branche
-   `main`.
+2. Ajoutez PostgreSQL et la référence `DATABASE_URL` (§5).
+3. Ajoutez `APP_PASSWORD` et `SESSION_SECRET` (§4).
+4. **Settings** → **Networking** → **Generate Domain**.
+5. Railway installe les dépendances (`npm install`), lance `npm start` et
+   redéploie à chaque commit sur `main`.
+
+En cas d'échec, ouvrez **Deployments** → **View logs** : les messages
+`[Teacher Match]` indiquent la variable manquante ou l'état de la base.
 
 ---
 
-## 8. Comment tester l'application
+## 7. Tester l'application
 
-### 8.1 Test rapide après déploiement
+### 7.1 Après déploiement
 
-1. Ouvrez le domaine généré par Railway : la page d'accueil Teacher Match doit
-   s'afficher.
-2. Ouvrez `/health` : la réponse doit indiquer
-   `"base_donnees":"connectee"`.
-3. Cliquez sur **Historique** dans le menu : la page doit s'afficher et indiquer
-   « Aucune demande enregistrée pour le moment ».
+1. Ouvrez le domaine : la page **Connexion** s'affiche.
+2. Saisissez `APP_PASSWORD` : la page d'accueil s'affiche.
+3. Ouvrez `/health` : `"base_donnees":"connectee"`.
+4. Le bouton **Déconnexion** du menu ramène à la page de connexion.
 
-### 8.2 Test de l'import
+### 7.2 Import
 
-1. Préparez **deux ou trois syllabi** en PDF ou Word (des fichiers de test
-   suffisent).
-2. Sur la page d'accueil, saisissez éventuellement un **libellé** (ex. :
-   « Rentrée septembre 2027 - Master Finance »).
-3. Ajoutez les documents : cliquez dans la zone de dépôt **ou** glissez-déposez
-   plusieurs fichiers d'un coup.
-   - Les fichiers apparaissent dans la liste avec leur taille.
-   - Le bouton **Retirer** permet d'en enlever un avant l'envoi.
-4. Cliquez sur **Générer le classement**.
-5. **Résultat attendu** : un message vert confirme l'importation et liste chaque
-   document avec sa taille, sa date d'import et sa référence.
-6. Le tableau « Syllabi déjà importés » se met à jour automatiquement ; chaque
-   ligne propose **Télécharger** pour récupérer le document enregistré.
+1. Préparez deux ou trois syllabi PDF ou Word.
+2. Saisissez éventuellement un libellé, ajoutez les documents (clic ou
+   glisser-déposer), cliquez **Générer le classement**.
+3. Un message vert liste les documents enregistrés et leur référence.
+4. Le tableau « Syllabi déjà importés » se met à jour : **Télécharger**
+   restitue le document à l'identique, **Supprimer** l'efface définitivement
+   après confirmation.
+5. La page **Historique** affiche la demande et ses documents.
 
-### 8.3 Vérifier l'enregistrement en base
-
-- Ouvrez la page **Historique** : une demande apparaît, datée d'aujourd'hui,
-  avec le nombre de syllabi et le tableau des documents.
-- Côté Railway, onglet **Data** du service PostgreSQL : les tables `syllabi`,
-  `demandes` et `demande_syllabi` contiennent les lignes correspondantes.
-- Téléchargez un document depuis le site et ouvrez-le : le contenu enregistré
-  est identique au fichier d'origine.
-
-### 8.4 Tests de sécurité attendus
+### 7.3 Tests de sécurité attendus
 
 | Test | Résultat attendu |
 | --- | --- |
-| Envoyer un `.txt` ou une image renommée en `.pdf` | Refusé, avec un message expliquant le motif. |
-| Envoyer un fichier de plus de 10 Mo | Refusé (message sur la taille maximale). |
-| Cliquer sur « Générer le classement » sans fichier | Message demandant de sélectionner au moins un document. |
-| Envoyer plus de 10 documents d'un coup | Refusé (maximum 10 par import). |
-| Ouvrir `/api/syllabi` dans le navigateur | Renvoie la liste des métadonnées, **jamais** le contenu des fichiers. |
-| Chercher une clé ou un secret dans le code du dépôt | Aucun : tout est lu dans les variables d'environnement. |
+| Ouvrir `/`, `/historique` ou `/api/syllabi` sans être connecté | Redirection vers la connexion (pages) ou erreur 401 (API). |
+| Onze mots de passe erronés en moins de 15 minutes | Erreur 429 « Trop de tentatives ». |
+| Envoyer un `.txt` ou une image renommée en `.pdf` | Refusé : le contenu ne correspond pas à l'extension. |
+| Envoyer un ZIP renommé en `.docx` | Refusé. |
+| Envoyer un fichier de plus de 10 Mo | Refusé (taille maximale). |
+| Envoyer plus de 10 documents d'un coup | Refusé (maximum 10). |
+| Supprimer la variable `APP_PASSWORD` | Page « Configuration incomplète », aucune donnée accessible. |
+| Chercher un secret dans le dépôt | Aucun. |
 
-### 8.5 Exécution en local (facultatif)
+### 7.4 Tests automatiques et exécution locale (facultatif)
 
-1. Installez Node.js 20 ou supérieur.
-2. Dans le dossier du projet : `npm install`.
-3. Copiez `.env.example` en `.env` et renseignez `DATABASE_URL` (une base
-   PostgreSQL locale ou une base hébergée) et `ANTHROPIC_API_KEY`.
-4. Lancez `npm start`, puis ouvrez `http://localhost:3000`.
-
----
-
-## 9. Sécurité et données personnelles
-
-- **Aucun secret dans le code** : clés et chaînes de connexion lues dans
-  l'environnement ; `.env` exclu du dépôt par `.gitignore`.
-- **Validation serveur systématique** : extension, type MIME, signature réelle
-  du fichier (un `.txt` renommé `.pdf` est refusé), taille maximale, nombre de
-  fichiers, longueur du libellé.
-- **Taille limitée** sur le corps des requêtes et sur chaque fichier.
-- **Jamais d'appel au modèle depuis le navigateur** : la clé Anthropic reste sur
-  le serveur.
-- **Noms de fichiers nettoyés** (suppression des chemins) et identifiant de
-  stockage **aléatoire** : impossible de deviner ou d'écraser un document.
-- **Contenus stockés en base**, hors de la racine web, et diffusés uniquement
-  par la route de téléchargement contrôlée.
-- **En-têtes de sécurité** : `Content-Security-Policy`, `X-Content-Type-Options`,
-  `X-Frame-Options`, `Referrer-Policy`.
-- **Collecte minimale** : seuls le document, son nom, sa taille, sa date et le
-  libellé facultatif sont conservés.
-- **Données personnelles** : les syllabus et, plus tard, les CV contiennent des
-  données personnelles. Prévoyez une durée de conservation, limitez l'accès aux
-  personnes habilitées, et supprimez les documents sur demande (RGPD).
-- **Sources externes** : à l'étape 4, seules des sources accessibles et
-  autorisées seront utilisées, sans contourner les protections des plateformes,
-  et les sources de chaque information seront conservées.
-- **Pas de critère discriminatoire** dans les analyses à venir.
-- **Vérification humaine** : les classements resteront indicatifs ; la décision
-  finale appartient au responsable pédagogique.
+1. Node.js 20 ou supérieur.
+2. `npm install`, puis `npm test` (8 tests : validation des fichiers,
+   sessions, choix TLS).
+3. Copiez `.env.example` en `.env`, renseignez `DATABASE_URL`,
+   `APP_PASSWORD` et `SESSION_SECRET`.
+4. `npm start`, puis `http://localhost:3000`.
 
 ---
 
-## 10. Licence
+## 8. Sécurité et données personnelles
+
+- Accès réservé aux personnes connaissant le mot de passe ; un mot de passe
+  partagé convient à une petite équipe. Pour plusieurs utilisateurs nominatifs,
+  prévoir des comptes individuels à une étape ultérieure.
+- Aucun secret dans le code ; validation serveur systématique ; contenus
+  stockés en base, hors de la racine web, diffusés par une route authentifiée.
+- Les syllabi et, plus tard, les CV contiennent des données personnelles :
+  définissez une durée de conservation, limitez l'accès, supprimez sur demande
+  (bouton « Supprimer »).
+- Étape 4 : seules des sources autorisées seront utilisées, sans contourner les
+  protections des plateformes, avec conservation des sources.
+- Aucun critère discriminatoire ; classements indicatifs, décision humaine.
+
+---
+
+## 9. Licence
 
 Parcours pédagogique conçu et déployé par Caroline Gans Combe (Omnes Education,
 2026). Licence CC BY-NC 4.0 :

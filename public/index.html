@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Teacher Match - Accueil</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <a class="lien-evitement" href="#contenu">Aller au contenu principal</a>
+
+  <header class="entete">
+    <div class="conteneur entete__contenu">
+      <a class="logo" href="/">
+        <span class="logo__marque">Teacher Match</span>
+        <span class="logo__sous-titre">Mise en relation enseignants / cours</span>
+      </a>
+      <nav class="navigation" aria-label="Navigation principale">
+        <a href="/" class="navigation__lien navigation__lien--actif">Accueil</a>
+        <a href="/resultats" class="navigation__lien">Résultats</a>
+        <a href="/historique" class="navigation__lien">Historique</a>
+        <form method="post" action="/deconnexion" class="navigation__formulaire">
+          <button type="submit" class="navigation__lien navigation__bouton">Déconnexion</button>
+        </form>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenu" class="conteneur">
+    <section class="hero">
+      <h1>Trouvez les enseignants les plus adaptés à vos cours</h1>
+      <p class="hero__texte">
+        Importez le ou les syllabi des cours à pourvoir. Teacher Match conserve chaque
+        document individuellement afin de pouvoir l'analyser par la suite et comparer
+        les profils des enseignants aux besoins pédagogiques de l'établissement.
+      </p>
+    </section>
+
+    <section class="carte" aria-labelledby="titre-import">
+      <h2 id="titre-import">Importer des syllabi</h2>
+      <p class="carte__aide">
+        Formats acceptés : <strong>PDF</strong>, <strong>DOC</strong> et <strong>DOCX</strong>.
+        Vous pouvez sélectionner plusieurs documents en une seule fois.
+      </p>
+
+      <!--
+        Le formulaire est envoyé par JavaScript vers /api/syllabi avec FormData.
+        Aucune clé ni aucun appel direct à un modèle d'IA ne transite par le navigateur.
+      -->
+      <form id="formulaire-import" novalidate>
+        <div class="champ">
+          <label for="libelle">Libellé de la demande <span class="facultatif">(facultatif)</span></label>
+          <input
+            type="text"
+            id="libelle"
+            name="libelle"
+            maxlength="200"
+            placeholder="Ex. : Rentrée septembre 2027 - Master Finance"
+            autocomplete="off"
+          />
+          <p class="champ__aide">Ce libellé vous permettra de retrouver la demande dans l'historique.</p>
+        </div>
+
+        <div class="champ">
+          <label for="syllabi">Syllabi à importer</label>
+
+          <div
+            id="zone-depot"
+            class="zone-depot"
+            tabindex="0"
+            role="button"
+            aria-describedby="aide-depot"
+          >
+            <p class="zone-depot__titre">Déposez vos documents ici</p>
+            <p class="zone-depot__soustitre">ou cliquez pour parcourir vos fichiers</p>
+            <input
+              type="file"
+              id="syllabi"
+              name="syllabi"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              multiple
+            />
+          </div>
+          <p id="aide-depot" class="champ__aide">
+            Maximum <span id="limite-nombre">10</span> documents par import, <span id="limite-taille">10</span> Mo par document. Les documents sont enregistrés dans la base
+            de données et conservés séparément pour leur analyse ultérieure.
+          </p>
+        </div>
+
+        <ul id="liste-fichiers" class="liste-fichiers" aria-live="polite"></ul>
+
+        <div class="barre-actions">
+          <button type="submit" class="bouton bouton--principal" id="bouton-generer">
+            Générer le classement
+          </button>
+          <button type="button" class="bouton bouton--secondaire" id="bouton-reinitialiser">
+            Réinitialiser
+          </button>
+          <span class="barre-actions__note">
+            Étape en cours : import et enregistrement. L'analyse du syllabus et le
+            classement des enseignants seront activés à l'étape suivante.
+          </span>
+        </div>
+      </form>
+
+      <div id="messages" class="messages" aria-live="polite"></div>
+    </section>
+
+    <section class="carte carte--douce" aria-labelledby="titre-syllabi">
+      <div class="carte__entete">
+        <h2 id="titre-syllabi">Syllabi déjà importés</h2>
+        <button type="button" class="bouton bouton--discret" id="bouton-rafraichir">
+          Rafraîchir
+        </button>
+      </div>
+      <div id="tableau-syllabi" class="tableau-conteneur">
+        <p class="vide">Chargement…</p>
+      </div>
+    </section>
+
+    <p class="mention">
+      Les documents importés sont utilisés uniquement pour la mise en relation des
+      enseignants avec les cours de l'établissement. La décision finale de recrutement
+      reste humaine : Teacher Match est un outil d'aide à la décision.
+    </p>
+  </main>
+
+  <footer class="pied">
+    <div class="conteneur">
+      <p>Teacher Match — outil d'aide à la décision pédagogique, entièrement en français.</p>
+      <p class="pied__licence">
+        Parcours pédagogique conçu et déployé par Caroline Gans Combe (Omnes Education, 2026).
+        Licence CC BY-NC 4.0.
+      </p>
+    </div>
+  </footer>
+
+  <script src="/accueil.js"></script>
+</body>
+</html>

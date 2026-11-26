@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Teacher Match - Connexion</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <a class="lien-evitement" href="#contenu">Aller au contenu principal</a>
+
+  <header class="entete">
+    <div class="conteneur entete__contenu">
+      <span class="logo">
+        <span class="logo__marque">Teacher Match</span>
+        <span class="logo__sous-titre">Mise en relation enseignants / cours</span>
+      </span>
+    </div>
+  </header>
+
+  <main id="contenu" class="conteneur conteneur--etroit">
+    <section class="carte" aria-labelledby="titre-connexion">
+      <h1 id="titre-connexion">Connexion</h1>
+      <p class="carte__aide">
+        L'accès à Teacher Match est réservé aux personnes habilitées : les documents
+        importés peuvent contenir des données personnelles.
+      </p>
+
+      <div id="messages" class="messages" aria-live="polite"></div>
+
+      <form method="post" action="/connexion">
+        <div class="champ">
+          <label for="mot_de_passe">Mot de passe</label>
+          <input
+            type="password"
+            id="mot_de_passe"
+            name="mot_de_passe"
+            required
+            maxlength="256"
+            autocomplete="current-password"
+            autofocus
+          />
+        </div>
+        <div class="barre-actions">
+          <button type="submit" class="bouton bouton--principal">Se connecter</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="pied">
+    <div class="conteneur">
+      <p>Teacher Match — outil d'aide à la décision pédagogique, entièrement en français.</p>
+      <p class="pied__licence">
+        Parcours pédagogique conçu et déployé par Caroline Gans Combe (Omnes Education, 2026).
+        Licence CC BY-NC 4.0.
+      </p>
+    </div>
+  </footer>
+
+  <script src="/connexion.js"></script>
+</body>
+</html>
