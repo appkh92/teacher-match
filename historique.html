@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teacher Match - Historique</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <a class="lien-evitement" href="#contenu">Aller au contenu principal</a>
+
+  <header class="entete">
+    <div class="conteneur entete__contenu">
+      <a class="logo" href="/">
+        <span class="logo__marque">Teacher Match</span>
+        <span class="logo__sous-titre">Mise en relation enseignants / cours</span>
+      </a>
+      <nav class="navigation" aria-label="Navigation principale">
+        <a href="/" class="navigation__lien">Accueil</a>
+        <a href="/resultats" class="navigation__lien">Résultats</a>
+        <a href="/historique" class="navigation__lien navigation__lien--actif">Historique</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenu" class="conteneur">
+    <div class="carte__entete">
+      <h1>Historique des demandes</h1>
+      <button type="button" class="bouton bouton--discret" id="bouton-rafraichir">Rafraîchir</button>
+    </div>
+
+    <p class="carte__aide">
+      Chaque demande regroupe les syllabi importés en une seule fois, avec la date
+      d'import et le classement généré (lorsqu'il existe).
+    </p>
+
+    <div id="historique" class="historique" aria-live="polite">
+      <p class="vide">Chargement…</p>
+    </div>
+  </main>
+
+  <footer class="pied">
+    <div class="conteneur">
+      <p>Teacher Match — outil d'aide à la décision pédagogique, entièrement en français.</p>
+      <p class="pied__licence">
+        Parcours pédagogique conçu et déployé par Caroline Gans Combe (Omnes Education, 2026).
+        Licence CC BY-NC 4.0.
+      </p>
+    </div>
+  </footer>
+
+  <script src="/historique.js"></script>
+</body>
+</html>
